@@ -3,6 +3,7 @@
   --txt:#f1f1f7; --muted:#a4a6c4; --accent:#ff4d8d; --accent2:#7c5cff; --ok:#3ddc97;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
 body{font-family:"Noto Sans JP","Outfit",sans-serif;color:var(--txt);min-height:100dvh;
   background:radial-gradient(circle at 20% 0%,#3a1d5c 0,transparent 50%),radial-gradient(circle at 100% 100%,#5c1d3f 0,transparent 45%),var(--bg);
   padding-bottom:140px}
@@ -66,3 +67,21 @@ dialog h2{font-size:1.2rem;margin-bottom:6px}
 .notice{position:fixed;left:50%;top:16px;transform:translate(-50%,-150%);max-width:90%;background:#2b2c4a;border:1px solid var(--line);
   padding:12px 16px;border-radius:14px;font-size:.85rem;line-height:1.5;transition:transform .3s;z-index:10;box-shadow:0 10px 30px #0008}
 .notice.show{transform:translate(-50%,0)}
+.top-actions{display:flex;gap:8px}
+.ghost.add{background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;font-weight:600}
+.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));padding:12px 22px;border-radius:999px;font-weight:600}
+.empty{padding:40px 10px;color:var(--muted);line-height:1.8}
+.empty .primary{margin-top:16px;color:#fff}
+.card-actions{display:flex;justify-content:flex-end;gap:6px;margin-bottom:4px}
+.card-actions .ghost{font-size:.75rem;padding:4px 10px}
+.big:disabled{opacity:.35;pointer-events:none}
+.add-form{display:flex;flex-direction:column;gap:12px}
+.add-form label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:600}
+.add-form label b{color:var(--accent)}
+.add-form input,.add-form textarea{font:inherit;font-weight:400;font-size:16px;color:var(--txt);background:rgba(0,0,0,.3);
+  border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none;transition:border-color .2s}
+.add-form input:focus,.add-form textarea:focus{border-color:var(--accent2)}
+.rec-box{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:rgba(255,77,141,.08);border-radius:12px;padding:10px}
+.rec-box .full{width:100%}
+#f-rec.on{border-color:var(--accent);color:var(--accent);animation:pulse 1s infinite}
+.form-btns{display:flex;justify-content:flex-end;gap:10px}

@@ -9,6 +9,7 @@ const TONES = {
 };
 
 const CATEGORIES = [
+  { id: "mine", label: "⭐ マイ単語" },
   { id: "aizuchi", label: "相槌" },
   { id: "chat", label: "チャット" },
   { id: "friends", label: "友達トーク" },

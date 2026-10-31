@@ -1,9 +1,19 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const state = { cat: CATEGORIES[0].id, idx: 0, recording: false, pitch: [], best: JSON.parse(localStorage.getItem("kg-best") || "{}") };
-  const list = () => PHRASES.filter((p) => p.cat === state.cat);
+  // マイ単語（端末内に保存）
+  const MINE_KEY = "kg-mine";
+  const loadMine = () => { try { return JSON.parse(localStorage.getItem(MINE_KEY) || "[]"); } catch { return []; } };
+  const saveMine = (arr) => {
+    try { localStorage.setItem(MINE_KEY, JSON.stringify(arr)); return true; }
+    catch { notice("保存容量がいっぱいです。録音つきの単語をいくつか削除してください"); return false; }
+  };
+  let mine = loadMine();
+  state.cat = mine.length ? "mine" : "aizuchi";
+  const list = () => state.cat === "mine" ? mine : PHRASES.filter((p) => p.cat === state.cat);
   const cur = () => list()[state.idx];
-  const tonesOf = (p) => p.jyut.split(" ").map((s) => +s.slice(-1));
+  const sylls = (p) => (p.jyut || "").trim().split(/\s+/).filter((s) => /^[a-z]+[1-6]$/i.test(s));
+  const tonesOf = (p) => sylls(p).map((s) => +s.slice(-1));
 
   /* ---------- UI ---------- */
   function renderTabs() {
@@ -20,18 +30,24 @@
   function render() {
     const p = cur();
     $("card").style.animation = "none"; void $("card").offsetWidth; $("card").style.animation = "";
+    const empty = !p;
+    $("empty").hidden = !empty; $("card-body").hidden = empty;
+    $("card-actions").hidden = state.cat !== "mine" || empty;
+    ["btn-play", "btn-slow", "btn-rec"].forEach((id) => ($(id).disabled = empty));
+    if (empty) { $("counter").textContent = ""; return; }
     $("counter").textContent = `${state.idx + 1} / ${list().length}` + (state.best[p.id] ? `　BEST ${state.best[p.id]}` : "");
     $("hanzi").textContent = p.hanzi;
-    $("jyut").innerHTML = p.jyut.split(" ").map((s) => {
+    const ss = sylls(p);
+    $("jyut").innerHTML = ss.length ? ss.map((s) => {
       const t = +s.slice(-1);
       return `<span class="syl"><b style="color:${TONES[t].color}">${s.slice(0, -1)}<sup>${t}</sup></b><i style="background:${TONES[t].color}">${TONES[t].name}</i></span>`;
-    }).join("");
-    $("jp").textContent = p.jp;
-    $("scene").textContent = p.scene;
-    $("tip").textContent = p.tip;
+    }).join("") : `<span class="muted">粤拼 未入力（声調グラフなし）</span>`;
+    $("jp").textContent = p.jp || "";
+    $("scene").textContent = p.scene || "";
+    $("tip").textContent = p.tip || "メモなし";
     $("result").hidden = true;
     state.pitch = [];
-    probeAudio(p.id);
+    if (p.audio) audioUrl[p.id] = p.audio; else probeAudio(p.id);
     drawGraph();
   }
 
@@ -53,7 +69,8 @@
     g.strokeStyle = "rgba(255,255,255,.08)"; g.fillStyle = "rgba(255,255,255,.3)"; g.font = "11px Outfit";
     for (let v = 1; v <= 5; v++) { g.beginPath(); g.moveTo(24, y(v)); g.lineTo(W, y(v)); g.stroke(); g.fillText(v, 6, y(v) + 4); }
 
-    const p = cur(), tones = tonesOf(p), exp = expectedCurve(p);
+    const p = cur(); if (!p) return;
+    const tones = tonesOf(p), exp = tones.length ? expectedCurve(p) : [];
     const x = (i, len) => 24 + (i / (len - 1)) * (W - 32);
     // 音節ごとに色分けしたお手本
     const per = exp.length / tones.length;
@@ -193,8 +210,9 @@
     const p = cur();
     const user = normalizeUser(state.pitch);
     if (user.length < 5) { showResult(0, "声が聞き取れませんでした", "もう少し大きな声でどうぞ", ""); return; }
-    const exp = expectedCurve(p);
-    const toneScore = Math.round(Math.max(0, pearson(resample(user, exp.length), exp)) * 100);
+    const hasTone = tonesOf(p).length > 0;
+    const exp = hasTone ? expectedCurve(p) : [];
+    const toneScore = hasTone ? Math.round(Math.max(0, pearson(resample(user, exp.length), exp)) * 100) : null;
 
     let textScore = null;
     if (SR) {
@@ -202,12 +220,13 @@
       const heard = transcript.split("|").map((t) => [...target].filter((ch) => t.includes(ch)).length / (target.length || 1));
       textScore = Math.round(Math.max(0, ...heard) * 100);
     }
-    const total = textScore === null ? toneScore : Math.round(textScore * 0.6 + toneScore * 0.4);
+    if (textScore === null && toneScore === null) { showResult(0, "採点できません", "粤拼を登録すると声調で採点できます", ""); return; }
+    const total = textScore === null ? toneScore : toneScore === null ? textScore : Math.round(textScore * 0.6 + toneScore * 0.4);
     const verdict = total >= 80 ? "🎉 ばっちり！ネイティブに通じる" : total >= 55 ? "👍 いい感じ！声調をもう一押し" : "💪 お手本をもう一度聞いてみよう";
-    const advice = toneScore < 60 ? "声調カーブがズレています。高低差を大げさに。" : "";
+    const advice = toneScore !== null && toneScore < 60 ? "声調カーブがズレています。高低差を大げさに。" : "";
     showResult(total, verdict,
       SR ? `認識: ${transcript.split("|")[0] || "（なし）"}` : "※音声認識非対応ブラウザ：声調のみで採点",
-      `文字 ${textScore ?? "-"} / 声調 ${toneScore}　${advice}`);
+      `文字 ${textScore ?? "-"} / 声調 ${toneScore ?? "-"}　${advice}`);
     if (total > (state.best[p.id] || 0)) { state.best[p.id] = total; localStorage.setItem("kg-best", JSON.stringify(state.best)); }
   }
 
@@ -233,7 +252,7 @@
   }
 
   /* ---------- Events ---------- */
-  const step = (d) => { state.idx = (state.idx + d + list().length) % list().length; render(); };
+  const step = (d) => { if (!list().length) return; state.idx = (state.idx + d + list().length) % list().length; render(); };
   $("btn-play").onclick = () => play(1);
   $("btn-slow").onclick = () => play(0.7);
   $("btn-rec").onclick = () => (state.recording ? stopRec() : startRec());
@@ -241,8 +260,68 @@
   $("btn-next").onclick = () => step(1);
   $("btn-tones").onclick = () => $("tone-dialog").showModal();
   $("close-dialog").onclick = () => $("tone-dialog").close();
+
+  /* ---------- マイ単語：追加・編集・削除 ---------- */
+  let editingId = null, recAudio = null, mrec = null, mstream = null;
+  function openForm(p) {
+    editingId = p ? p.id : null; recAudio = p ? p.audio || null : null;
+    $("f-hanzi").value = p?.hanzi || ""; $("f-jyut").value = p?.jyut || "";
+    $("f-jp").value = p?.jp || ""; $("f-scene").value = p?.scene || ""; $("f-tip").value = p?.tip || "";
+    $("form-title").textContent = p ? "単語を編集" : "今日の単語を追加";
+    updateRecUI(); $("add-dialog").showModal();
+  }
+  function updateRecUI() {
+    $("f-rec-status").textContent = recAudio ? "✅ お手本録音あり" : "録音なし（読み上げ音声を使用）";
+    $("f-rec-play").hidden = !recAudio; $("f-rec-del").hidden = !recAudio;
+  }
+  $("btn-add").onclick = () => openForm(null);
+  $("empty-add").onclick = () => openForm(null);
+  $("btn-edit").onclick = () => openForm(cur());
+  $("btn-del").onclick = () => {
+    const p = cur(); if (!p || !confirm(`「${p.hanzi}」を削除しますか？`)) return;
+    mine = mine.filter((m) => m.id !== p.id); saveMine(mine); delete audioUrl[p.id];
+    state.idx = Math.max(0, Math.min(state.idx, mine.length - 1)); render();
+  };
+  $("f-cancel").onclick = () => { stopFormRec(); $("add-dialog").close(); };
+  // 友達に言ってもらってその場で録音（最長5秒）
+  $("f-rec").onclick = async () => {
+    if (mrec) return stopFormRec();
+    if (!window.MediaRecorder) return notice("このブラウザは録音に対応していません");
+    try { mstream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return notice("マイクの使用を許可してください"); }
+    const chunks = []; mrec = new MediaRecorder(mstream);
+    mrec.ondataavailable = (e) => chunks.push(e.data);
+    mrec.onstop = () => {
+      const blob = new Blob(chunks, { type: mrec.mimeType || "audio/mp4" });
+      const r = new FileReader(); r.onload = () => { recAudio = r.result; updateRecUI(); }; r.readAsDataURL(blob);
+      mstream.getTracks().forEach((t) => t.stop()); mrec = null;
+      $("f-rec").textContent = "🎙 お手本を録音"; $("f-rec").classList.remove("on");
+    };
+    mrec.start(); $("f-rec").textContent = "■ 停止"; $("f-rec").classList.add("on");
+    setTimeout(() => mrec && stopFormRec(), 5000);
+  };
+  function stopFormRec() { try { mrec?.stop(); } catch {} }
+  $("f-rec-play").onclick = () => recAudio && new Audio(recAudio).play();
+  $("f-rec-del").onclick = () => { recAudio = null; updateRecUI(); };
+  $("add-form").onsubmit = (e) => {
+    e.preventDefault();
+    const hanzi = $("f-hanzi").value.trim();
+    const jyut = $("f-jyut").value.trim().toLowerCase().replace(/\s+/g, " ");
+    if (!hanzi) return;
+    if (jyut && jyut.split(" ").some((s) => !/^[a-z]+[1-6]$/.test(s))) {
+      return notice("粤拼は「nei5 hou2」のように、音節ごとに声調番号(1〜6)を付けてスペースで区切ってください");
+    }
+    const item = { id: editingId || "mine-" + Date.now(), cat: "mine", hanzi, jyut,
+      jp: $("f-jp").value.trim(), scene: $("f-scene").value.trim(), tip: $("f-tip").value.trim(), audio: recAudio };
+    const next = editingId ? mine.map((m) => (m.id === editingId ? item : m)) : [item, ...mine];
+    if (!saveMine(next)) return;
+    mine = next; delete audioUrl[item.id];
+    $("add-dialog").close();
+    state.cat = "mine"; state.idx = mine.findIndex((m) => m.id === item.id);
+    renderTabs(); render(); notice(editingId ? "更新しました" : "追加しました！");
+  };
+
   document.addEventListener("keydown", (e) => {
-    if (e.target.tagName === "INPUT") return;
+    if (["INPUT", "TEXTAREA"].includes(e.target.tagName) || $("add-dialog").open) return;
     if (e.key === " ") { e.preventDefault(); play(1); }
     if (e.key === "r") $("btn-rec").click();
     if (e.key === "ArrowRight") step(1);

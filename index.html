@@ -7,18 +7,30 @@
   <meta name="description" content="日本語話者向け、香港の友達とのラフな会話・チャット・スラングに特化した広東語発音練習アプリ。声調判定つき。" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+HK:wght@500;700&family=Noto+Sans+JP:wght@400;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
   <header class="top">
     <h1>傾偈 <span>King Gai</span></h1>
-    <button id="btn-tones" class="ghost">6声調</button>
+    <div class="top-actions">
+      <button id="btn-add" class="ghost add">＋ 単語追加</button>
+      <button id="btn-tones" class="ghost">6声調</button>
+    </div>
   </header>
 
   <nav id="tabs" class="tabs"></nav>
 
   <main>
     <section class="card" id="card">
+      <div class="empty" id="empty" hidden>
+        <p>まだマイ単語がありません。<br>友達に教わった言葉を追加しよう！</p>
+        <button id="empty-add" class="primary">＋ 今日の単語を追加</button>
+      </div>
+      <div id="card-body">
+      <div class="card-actions" id="card-actions" hidden>
+        <button id="btn-edit" class="ghost">✏️ 編集</button>
+        <button id="btn-del" class="ghost">🗑 削除</button>
+      </div>
       <div class="counter" id="counter"></div>
       <div class="hanzi" id="hanzi"></div>
       <div class="jyut" id="jyut"></div>
@@ -43,6 +55,7 @@
         <summary>💡 発音のコツ</summary>
         <p id="tip"></p>
       </details>
+      </div>
     </section>
   </main>
 
@@ -66,7 +79,40 @@
     <button id="close-dialog" class="ghost">閉じる</button>
   </dialog>
 
-  <script src="data.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <dialog id="add-dialog">
+    <form id="add-form" class="add-form">
+      <h2 id="form-title">今日の単語を追加</h2>
+      <label>広東語（漢字など）<b>*</b>
+        <input id="f-hanzi" required placeholder="例：你好叻咁　/　好chill" autocomplete="off" />
+      </label>
+      <label>粤拼（声調番号つき・任意）
+        <input id="f-jyut" placeholder="例：nei5 hou2 gwai2 gam2" autocomplete="off" autocapitalize="off" />
+        <small class="muted">入れると声調グラフと声調の採点が使えます。友達に聞くのが確実！</small>
+      </label>
+      <label>意味
+        <input id="f-jp" placeholder="例：めっちゃいい人だね" autocomplete="off" />
+      </label>
+      <label>使う場面
+        <input id="f-scene" placeholder="例：友達を褒めるとき" autocomplete="off" />
+      </label>
+      <label>発音メモ
+        <textarea id="f-tip" rows="2" placeholder="例：gwai2 は上げる。友達は早口だった"></textarea>
+      </label>
+      <div class="rec-box">
+        <button type="button" id="f-rec" class="ghost">🎙 お手本を録音</button>
+        <button type="button" id="f-rec-play" class="ghost" hidden>▶</button>
+        <button type="button" id="f-rec-del" class="ghost" hidden>✕</button>
+        <small id="f-rec-status" class="muted"></small>
+        <small class="muted full">友達にその場で言ってもらうと、その声がお手本になります（最長5秒）</small>
+      </div>
+      <div class="form-btns">
+        <button type="button" id="f-cancel" class="ghost">キャンセル</button>
+        <button type="submit" id="f-save" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="data.js?v=4"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

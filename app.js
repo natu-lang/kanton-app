@@ -31,6 +31,7 @@
     $("tip").textContent = p.tip;
     $("result").hidden = true;
     state.pitch = [];
+    probeAudio(p.id);
     drawGraph();
   }
 
@@ -75,18 +76,42 @@
   const pickVoice = () => { voice = speechSynthesis.getVoices().find((v) => /zh[-_]HK|yue/i.test(v.lang)) || null; };
   if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 
+  // 録音ファイルの有無を事前に調べてキャッシュ（タップ時に即再生するため）
+  const audioUrl = {};
+  async function probeAudio(id) {
+    if (id in audioUrl) return;
+    audioUrl[id] = null;
+    for (const ext of ["mp3", "m4a", "wav"]) {
+      try { const r = await fetch(`audio/${id}.${ext}`, { method: "HEAD" }); if (r.ok) { audioUrl[id] = `audio/${id}.${ext}`; return; } } catch {}
+    }
+  }
+
+  function notice(msg) {
+    let n = $("notice");
+    if (!n) { n = document.createElement("div"); n.id = "notice"; n.className = "notice"; document.body.appendChild(n); }
+    n.textContent = msg; n.classList.add("show");
+    clearTimeout(n._t); n._t = setTimeout(() => n.classList.remove("show"), 5000);
+  }
+
   function play(rate = 1) {
     const p = cur(); $("btn-play").classList.add("on");
     const done = () => $("btn-play").classList.remove("on");
-    // ネイティブ録音があれば優先
-    const audio = new Audio(`audio/${p.id}.mp3`);
-    audio.playbackRate = rate; audio.onended = done;
-    audio.play().catch(() => {
-      const u = new SpeechSynthesisUtterance(p.hanzi.replace(/[a-z]+/gi, (m) => m));
-      u.lang = "zh-HK"; if (voice) u.voice = voice; u.rate = rate * 0.9; u.onend = done; u.onerror = done;
-      speechSynthesis.cancel(); speechSynthesis.speak(u);
-      if (!voice) console.warn("広東語(zh-HK)音声が見つかりません。OSに広東語音声を追加してください。");
-    });
+    if (audioUrl[p.id]) {
+      const audio = new Audio(audioUrl[p.id]);
+      audio.preservesPitch = true; audio.playbackRate = rate; audio.onended = done; audio.onerror = done;
+      audio.play().catch(done);
+      return;
+    }
+    // 読み上げ（タップ直後に同期で呼ぶ必要がある）
+    if (!("speechSynthesis" in window)) { done(); notice("このブラウザは音声読み上げに対応していません"); return; }
+    if (!voice) pickVoice();
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(p.hanzi);
+    u.lang = "zh-HK"; if (voice) u.voice = voice; u.rate = rate * 0.9;
+    u.onend = done; u.onerror = done;
+    speechSynthesis.speak(u);
+    if (!voice) notice("広東語の読み上げ音声が端末に見つかりません。設定で「中文（香港）」音声を追加してください。マナーモードも確認してね");
+    setTimeout(done, 6000);
   }
 
   /* ---------- Recording + Pitch ---------- */

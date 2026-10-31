@@ -105,12 +105,19 @@
     // 読み上げ（タップ直後に同期で呼ぶ必要がある）
     if (!("speechSynthesis" in window)) { done(); notice("このブラウザは音声読み上げに対応していません"); return; }
     if (!voice) pickVoice();
-    speechSynthesis.cancel();
+    if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+    speechSynthesis.resume(); // iOSで一時停止状態に固まるのを解除
     const u = new SpeechSynthesisUtterance(p.hanzi);
-    u.lang = "zh-HK"; if (voice) u.voice = voice; u.rate = rate * 0.9;
-    u.onend = done; u.onerror = done;
+    u.lang = "zh-HK"; if (voice) u.voice = voice; u.rate = rate * 0.9; u.volume = 1;
+    let started = false;
+    u.onstart = () => (started = true);
+    u.onend = done;
+    u.onerror = (e) => { done(); notice(`読み上げエラー: ${e.error}（声: ${voice ? voice.name : "なし"}）`); };
     speechSynthesis.speak(u);
-    if (!voice) notice("広東語の読み上げ音声が端末に見つかりません。設定で「中文（香港）」音声を追加してください。マナーモードも確認してね");
+    if (!voice) notice("広東語の読み上げ音声が端末に見つかりません。設定で「中国語（香港）」の声を追加してください");
+    setTimeout(() => {
+      if (!started) { done(); notice(`音声が始まりませんでした（声: ${voice ? voice.name : "なし"} / 音声数: ${speechSynthesis.getVoices().length}）。マナーモードと音量を確認してください`); }
+    }, 2500);
     setTimeout(done, 6000);
   }
 

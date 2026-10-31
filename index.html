@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>傾偈 King Gai｜友達と話せる広東語</title>
+  <meta name="description" content="日本語話者向け、香港の友達とのラフな会話・チャット・スラングに特化した広東語発音練習アプリ。声調判定つき。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+HK:wght@500;700&family=Noto+Sans+JP:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <h1>傾偈 <span>King Gai</span></h1>
+    <button id="btn-tones" class="ghost">6声調</button>
+  </header>
+
+  <nav id="tabs" class="tabs"></nav>
+
+  <main>
+    <section class="card" id="card">
+      <div class="counter" id="counter"></div>
+      <div class="hanzi" id="hanzi"></div>
+      <div class="jyut" id="jyut"></div>
+      <div class="jp" id="jp"></div>
+      <p class="scene" id="scene"></p>
+
+      <div class="graph-wrap">
+        <canvas id="graph" width="600" height="180"></canvas>
+        <div class="legend"><span class="lg-exp">お手本</span><span class="lg-you">あなた</span></div>
+      </div>
+
+      <div class="result" id="result" hidden>
+        <div class="score-ring"><svg viewBox="0 0 36 36"><path class="bg" d="M18 2a16 16 0 1 1 0 32a16 16 0 1 1 0-32"/><path id="ring" class="fg" stroke-dasharray="0,100" d="M18 2a16 16 0 1 1 0 32a16 16 0 1 1 0-32"/></svg><b id="score">0</b></div>
+        <div class="result-detail">
+          <div id="verdict"></div>
+          <small id="heard"></small>
+          <small id="sub"></small>
+        </div>
+      </div>
+
+      <details class="tip" open>
+        <summary>💡 発音のコツ</summary>
+        <p id="tip"></p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="controls">
+    <button id="btn-prev" class="nav" aria-label="前へ">‹</button>
+    <button id="btn-slow" class="small" aria-label="スロー再生">🐢</button>
+    <button id="btn-play" class="big play" aria-label="再生">▶</button>
+    <button id="btn-rec" class="big rec" aria-label="録音">🎤</button>
+    <button id="btn-next" class="nav" aria-label="次へ">›</button>
+  </footer>
+
+  <dialog id="tone-dialog">
+    <h2>広東語の6声調</h2>
+    <p class="muted">日本語は「高・低」の2段階。広東語は5段階の高さで6種類を区別します。</p>
+    <div id="tone-grid" class="tone-grid"></div>
+    <ul class="muted pitfalls">
+      <li>3声と6声の差は小さい：6声は「ぼそっと」低く。</li>
+      <li>2声と5声：2声は高く跳ね上がる、5声は少しだけ上がる。</li>
+      <li>-p/-t/-k は音を出さず口の形で止める。</li>
+    </ul>
+    <button id="close-dialog" class="ghost">閉じる</button>
+  </dialog>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

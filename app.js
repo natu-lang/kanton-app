@@ -11,12 +11,15 @@
   let mine = loadMine();
   // マイ単語に中国語・粤拼が無ければ、同じ単語のデフォルトカードから自動補完
   (() => {
-    const alias = { "好啊": "hou2aa3", "俩": "b-loeng5", "两": "b-loeng5", "我想在香港俩星期": "b-hoeng1gong2" };
+    const alias = { "好啊": "hou2aa3", "俩": "b-loeng5", "两": "b-loeng5", "我想在香港俩星期": "b-hoeng1gong2",
+      "眼瞓": "b-ngaan5fan3", "眼瞟": "b-ngaan5fan3", "眼训": "b-ngaan5fan3", "眼訓": "b-ngaan5fan3", "眼睏": "b-ngaan5fan3", "眼困": "b-ngaan5fan3" };
     const byHanzi = Object.fromEntries(PHRASES.map((p) => [p.hanzi.replace(/[？?]/g, ""), p]));
+    const normJp = (s) => (s || "").replace(/[\s！!？?ー～〜。、]/g, "");
     let changed = false;
     mine.forEach((m) => {
       const key = (m.hanzi || "").replace(/[？?\s]/g, "");
-      const src = alias[key] ? PHRASES.find((p) => p.id === alias[key]) : byHanzi[key];
+      const src = (alias[key] ? PHRASES.find((p) => p.id === alias[key]) : byHanzi[key])
+        || (m.jp && PHRASES.find((p) => p.cat === "basic" && normJp(p.jp) === normJp(m.jp)));
       if (!src) return;
       if (!m.zh && src.zh) { m.zh = src.zh; m.zhKana = src.zhKana; changed = true; }
       if (!m.jyut && src.jyut && alias[key] !== "b-hoeng1gong2" && !["俩", "两"].includes(key)) { m.jyut = src.jyut; changed = true; }

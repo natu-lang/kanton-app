@@ -7,7 +7,7 @@
   <meta name="description" content="日本語話者向け、香港の友達とのラフな会話・チャット・スラングに特化した広東語発音練習アプリ。声調判定つき。" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Noto+Sans+HK:wght@500;700&family=Noto+Sans+JP:wght@400;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
   <header class="top">
@@ -32,6 +32,10 @@
         <button id="btn-del" class="ghost">🗑 削除</button>
       </div>
       <div class="counter" id="counter"></div>
+      <div class="tag-row" id="tag-row">
+        <button type="button" id="tag-freq" class="tag-btn freq">🔥 頻出</button>
+        <button type="button" id="tag-slang" class="tag-btn slang">🤬 スラング</button>
+      </div>
       <div class="hanzi" id="hanzi"></div>
       <div class="jyut" id="jyut"></div>
       <div class="jp" id="jp"></div>
@@ -55,6 +59,13 @@
         <summary>💡 発音のコツ</summary>
         <p id="tip"></p>
       </details>
+
+      <div class="zh-box" id="zh-box">
+        <span class="zh-label">普通話</span>
+        <span class="zh-text"><b id="zh"></b><small id="zh-kana"></small></span>
+        <button id="btn-zh-play" class="zh-btn" aria-label="普通話を再生">▶</button>
+        <button id="btn-zh-rec" class="zh-btn rec" aria-label="普通話で採点">🎤</button>
+      </div>
       </div>
     </section>
   </main>
@@ -85,9 +96,9 @@
       <label>広東語（漢字など）<b>*</b>
         <input id="f-hanzi" required placeholder="例：你好叻咁　/　好chill" autocomplete="off" />
       </label>
-      <label>粤拼（声調番号つき・任意）
+      <label>粤拼（わかればでOK・空欄で大丈夫）
         <input id="f-jyut" placeholder="例：nei5 hou2 gwai2 gam2" autocomplete="off" autocapitalize="off" />
-        <small class="muted">入れると声調グラフと声調の採点が使えます。友達に聞くのが確実！</small>
+        <small class="muted">お手本を録音すれば、粤拼なしでも友達の声と比べて採点できます</small>
       </label>
       <label>意味
         <input id="f-jp" placeholder="例：めっちゃいい人だね" autocomplete="off" />
@@ -95,6 +106,16 @@
       <label>使う場面
         <input id="f-scene" placeholder="例：友達を褒めるとき" autocomplete="off" />
       </label>
+      <label>普通話（任意）
+        <input id="f-zh" placeholder="例：你人真好" autocomplete="off" />
+      </label>
+      <label>普通話の発音カナ（任意）
+        <input id="f-zhkana" placeholder="例：ニー レン ジェンハオ" autocomplete="off" />
+      </label>
+      <div class="tag-pick">
+        <label><input type="checkbox" id="f-tag-freq" /> 🔥 頻出</label>
+        <label><input type="checkbox" id="f-tag-slang" /> 🤬 スラング</label>
+      </div>
       <label>発音メモ
         <textarea id="f-tip" rows="2" placeholder="例：gwai2 は上げる。友達は早口だった"></textarea>
       </label>
@@ -112,7 +133,7 @@
     </form>
   </dialog>
 
-  <script src="data.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="data.js?v=6"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

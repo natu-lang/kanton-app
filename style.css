@@ -85,3 +85,29 @@ dialog h2{font-size:1.2rem;margin-bottom:6px}
 .rec-box .full{width:100%}
 #f-rec.on{border-color:var(--accent);color:var(--accent);animation:pulse 1s infinite}
 .form-btns{display:flex;justify-content:flex-end;gap:10px}
+
+/* ---------- Tags ---------- */
+.tag-row { display: flex; gap: 6px; justify-content: center; margin: 4px 0 8px; }
+.tag-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px dashed rgba(255,255,255,.25);
+  background: transparent; color: rgba(255,255,255,.45); cursor: pointer; transition: all .2s; }
+.tag-btn:hover { color: #fff; border-color: rgba(255,255,255,.5); }
+.tag-btn.freq.on { background: rgba(255,169,77,.18); border: 1px solid #ffa94d; color: #ffa94d; }
+.tag-btn.slang.on { background: rgba(255,107,107,.18); border: 1px solid #ff6b6b; color: #ff6b6b; }
+.tag-btn.on { animation: tagPop .25s ease; }
+@keyframes tagPop { 50% { transform: scale(1.12); } }
+.tag-pick { display: flex; gap: 16px; font-size: 14px; }
+.tag-pick label { display: flex; align-items: center; gap: 6px; flex-direction: row; }
+
+/* ---------- Mandarin strip ---------- */
+.zh-box { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 8px 12px;
+  border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); font-size: 13px; }
+.zh-box[hidden] { display: none; }
+.zh-label { font-size: 10px; padding: 2px 6px; border-radius: 6px; background: rgba(77,171,247,.18); color: #74c0fc; white-space: nowrap; }
+.zh-text { flex: 1; display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.zh-text b { font-family: "Noto Sans HK", sans-serif; font-weight: 500; color: rgba(255,255,255,.85); }
+.zh-text small { color: rgba(255,255,255,.5); font-size: 11px; }
+.zh-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,255,255,.15);
+  background: rgba(255,255,255,.06); color: #fff; font-size: 13px; cursor: pointer; flex-shrink: 0; transition: all .2s; }
+.zh-btn:hover { background: rgba(255,255,255,.14); }
+.zh-btn.on { background: #4dabf7; border-color: #4dabf7; }
+.zh-btn.rec.on { background: #ff4d8d; border-color: #ff4d8d; animation: tagPop 1s infinite; }

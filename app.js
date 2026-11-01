@@ -9,8 +9,17 @@
     catch { notice("保存容量がいっぱいです。録音つきの単語をいくつか削除してください"); return false; }
   };
   let mine = loadMine();
-  state.cat = mine.length ? "mine" : "aizuchi";
-  const list = () => state.cat === "mine" ? mine : PHRASES.filter((p) => p.cat === state.cat);
+  state.cat = mine.length ? "mine" : "greet";
+  // タグ（デフォルト単語にも付けられるよう端末内に上書き保存）
+  const TAG_KEY = "kg-tags";
+  let userTags = (() => { try { return JSON.parse(localStorage.getItem(TAG_KEY) || "{}"); } catch { return {}; } })();
+  const tagsOf = (p) => userTags[p.id] ?? p.tags ?? [];
+  const setTags = (id, arr) => { userTags[id] = arr; localStorage.setItem(TAG_KEY, JSON.stringify(userTags)); };
+  const list = () => {
+    if (state.cat === "mine") return mine;
+    if (state.cat.startsWith("tag-")) { const t = state.cat.slice(4); return [...mine, ...PHRASES].filter((p) => tagsOf(p).includes(t)); }
+    return PHRASES.filter((p) => p.cat === state.cat);
+  };
   const cur = () => list()[state.idx];
   const sylls = (p) => (p.jyut || "").trim().split(/\s+/).filter((s) => /^[a-z]+[1-6]$/i.test(s));
   const tonesOf = (p) => sylls(p).map((s) => +s.slice(-1));
@@ -34,14 +43,25 @@
     $("empty").hidden = !empty; $("card-body").hidden = empty;
     $("card-actions").hidden = state.cat !== "mine" || empty;
     ["btn-play", "btn-slow", "btn-rec"].forEach((id) => ($(id).disabled = empty));
-    if (empty) { $("counter").textContent = ""; return; }
+    if (empty) {
+      $("counter").textContent = "";
+      $("empty").querySelector("p").innerHTML = state.cat.startsWith("tag-")
+        ? "このタグの単語はまだありません。<br>カードのタグボタンで付けられます。"
+        : "まだマイ単語がありません。<br>友達に教わった言葉を追加しよう！";
+      return;
+    }
+    const tg = tagsOf(p);
+    $("tag-freq").classList.toggle("on", tg.includes("freq"));
+    $("tag-slang").classList.toggle("on", tg.includes("slang"));
+    $("zh-box").hidden = !p.zh;
+    $("zh").textContent = p.zh || ""; $("zh-kana").textContent = p.zhKana || "";
     $("counter").textContent = `${state.idx + 1} / ${list().length}` + (state.best[p.id] ? `　BEST ${state.best[p.id]}` : "");
     $("hanzi").textContent = p.hanzi;
     const ss = sylls(p);
     $("jyut").innerHTML = ss.length ? ss.map((s) => {
       const t = +s.slice(-1);
       return `<span class="syl"><b style="color:${TONES[t].color}">${s.slice(0, -1)}<sup>${t}</sup></b><i style="background:${TONES[t].color}">${TONES[t].name}</i></span>`;
-    }).join("") : `<span class="muted">粤拼 未入力（声調グラフなし）</span>`;
+    }).join("") : `<span class="muted">${p.audio ? "🎙 友達のお手本で練習" : "お手本を録音すると採点できます"}</span>`;
     $("jp").textContent = p.jp || "";
     $("scene").textContent = p.scene || "";
     $("tip").textContent = p.tip || "メモなし";
@@ -49,6 +69,33 @@
     state.pitch = [];
     if (p.audio) audioUrl[p.id] = p.audio; else probeAudio(p.id);
     drawGraph();
+    ensureRef(p).then(() => cur() === p && drawGraph());
+  }
+
+  /* ---------- お手本音声から声の高さカーブを抽出 ---------- */
+  const refCurve = {};
+  async function analyzeAudio(url) {
+    const buf = await (await fetch(url)).arrayBuffer();
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+      const audio = await new Promise((ok, ng) => ac.decodeAudioData(buf, ok, ng));
+      const data = audio.getChannelData(0), sr = audio.sampleRate, win = 2048, hop = Math.floor(sr / 50);
+      const hz = [];
+      for (let i = 0; i + win < data.length; i += hop) {
+        const f = autoCorrelate(data.subarray(i, i + win), sr);
+        if (f > 0) hz.push(f);
+      }
+      const n = normalizeUser(hz);
+      return n.length >= 5 ? resample(n, 60) : null;
+    } finally { ac.close?.(); }
+  }
+  async function ensureRef(p) {
+    if (p.id in refCurve) return refCurve[p.id];
+    if (!p.audio) await probeAudio(p.id);
+    const url = audioUrl[p.id];
+    if (!url) return null;
+    try { refCurve[p.id] = await analyzeAudio(url); } catch { refCurve[p.id] = null; }
+    return refCurve[p.id];
   }
 
   /* ---------- Graph ---------- */
@@ -70,8 +117,15 @@
     for (let v = 1; v <= 5; v++) { g.beginPath(); g.moveTo(24, y(v)); g.lineTo(W, y(v)); g.stroke(); g.fillText(v, 6, y(v) + 4); }
 
     const p = cur(); if (!p) return;
-    const tones = tonesOf(p), exp = tones.length ? expectedCurve(p) : [];
     const x = (i, len) => 24 + (i / (len - 1)) * (W - 32);
+    const ref = refCurve[p.id];
+    if (ref) {
+      // 友達（お手本）の声の高さ
+      g.beginPath(); g.lineWidth = 8; g.lineCap = "round"; g.lineJoin = "round"; g.strokeStyle = "rgba(255,255,255,.45)";
+      ref.forEach((v, i) => (i ? g.lineTo(x(i, ref.length), y(v)) : g.moveTo(x(i, ref.length), y(v))));
+      g.stroke();
+    }
+    const tones = ref ? [] : tonesOf(p), exp = tones.length ? expectedCurve(p) : [];
     // 音節ごとに色分けしたお手本
     const per = exp.length / tones.length;
     tones.forEach((t, k) => {
@@ -89,9 +143,26 @@
   }
 
   /* ---------- Playback ---------- */
-  let voice = null;
-  const pickVoice = () => { voice = speechSynthesis.getVoices().find((v) => /zh[-_]HK|yue/i.test(v.lang)) || null; };
+  let voice = null, zhVoice = null;
+  const pickVoice = () => {
+    const vs = speechSynthesis.getVoices();
+    voice = vs.find((v) => /zh[-_]HK|yue/i.test(v.lang)) || null;
+    zhVoice = vs.find((v) => /zh[-_](CN|Hans)|cmn/i.test(v.lang)) || vs.find((v) => /zh[-_]TW/i.test(v.lang)) || null;
+  };
   if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+  function playZh() {
+    const p = cur(); if (!p?.zh) return;
+    if (!("speechSynthesis" in window)) return notice("このブラウザは音声読み上げに対応していません");
+    if (!zhVoice) pickVoice();
+    if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+    speechSynthesis.resume();
+    const u = new SpeechSynthesisUtterance(p.zh.split(/[／/]/)[0]);
+    u.lang = "zh-CN"; if (zhVoice) u.voice = zhVoice; u.rate = 0.85;
+    $("btn-zh-play").classList.add("on");
+    u.onend = u.onerror = () => $("btn-zh-play").classList.remove("on");
+    speechSynthesis.speak(u);
+  }
 
   // 録音ファイルの有無を事前に調べてキャッシュ（タップ時に即再生するため）
   const audioUrl = {};
@@ -115,8 +186,11 @@
     const done = () => $("btn-play").classList.remove("on");
     if (audioUrl[p.id]) {
       const audio = new Audio(audioUrl[p.id]);
-      audio.preservesPitch = true; audio.playbackRate = rate; audio.onended = done; audio.onerror = done;
-      audio.play().catch(done);
+      audio.preservesPitch = true; audio.webkitPreservesPitch = true;
+      audio.defaultPlaybackRate = rate; audio.playbackRate = rate; audio.onended = done; audio.onerror = done;
+      // iOSは再生開始時に速度がリセットされることがあるので再設定
+      audio.onplaying = () => { audio.playbackRate = rate; };
+      audio.play().then(() => { audio.playbackRate = rate; }).catch(done);
       return;
     }
     // 読み上げ（タップ直後に同期で呼ぶ必要がある）
@@ -125,7 +199,7 @@
     if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
     speechSynthesis.resume(); // iOSで一時停止状態に固まるのを解除
     const u = new SpeechSynthesisUtterance(p.hanzi);
-    u.lang = "zh-HK"; if (voice) u.voice = voice; u.rate = rate * 0.9; u.volume = 1;
+    u.lang = "zh-HK"; if (voice) u.voice = voice; u.rate = rate < 1 ? 0.5 : 0.9; u.volume = 1;
     let started = false;
     u.onstart = () => (started = true);
     u.onend = done;
@@ -164,13 +238,24 @@
     return st.map((s) => Math.min(5, Math.max(1, 1 + ((s - lo) / range) * 4)));
   }
 
-  async function startRec() {
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch { alert("マイクの使用を許可してください"); return; }
+  let srcNode;
+  const recBtn = () => $(state.mode === "zh" ? "btn-zh-rec" : "btn-rec");
+  async function startRec(mode = "yue") {
+    state.mode = mode;
+    // iOS: AudioContextはタップ直後(同期)に作成/再開し、使い回す
+    if (!ctx || ctx.state === "closed") ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const resumed = ctx.resume();
+    // マイクは使い回す（iOSでは停止→再取得すると2回目以降が無音になる）
+    if (!stream || !stream.getAudioTracks().some((t) => t.readyState === "live")) {
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+      catch { alert("マイクの使用を許可してください"); return; }
+      srcNode = null;
+    }
+    await resumed.catch(() => {});
     state.recording = true; state.pitch = []; transcript = "";
-    $("btn-rec").classList.add("on"); $("btn-rec").textContent = "■";
-    ctx = new AudioContext(); analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
-    ctx.createMediaStreamSource(stream).connect(analyser);
+    recBtn().classList.add("on"); recBtn().textContent = "■";
+    if (!analyser) { analyser = ctx.createAnalyser(); analyser.fftSize = 2048; }
+    if (!srcNode) { srcNode = ctx.createMediaStreamSource(stream); srcNode.connect(analyser); }
     const buf = new Float32Array(analyser.fftSize);
     const loop = () => {
       analyser.getFloatTimeDomainData(buf);
@@ -180,10 +265,10 @@
     };
     loop();
     if (SR) {
-      recog = new SR(); recog.lang = "zh-HK"; recog.interimResults = false; recog.maxAlternatives = 3;
-      recog.onresult = (e) => { transcript = [...e.results[0]].map((a) => a.transcript).join("|"); };
-      recog.onend = () => state.recording && stopRec();
-      recog.start();
+      const r = recog = new SR(); r.lang = mode === "zh" ? "zh-CN" : "zh-HK"; r.interimResults = false; r.maxAlternatives = 3;
+      r.onresult = (e) => { if (recog === r || !state.recording) transcript = [...e.results[0]].map((a) => a.transcript).join("|"); };
+      r.onend = () => recog === r && state.recording && stopRec();
+      r.start();
     }
     setTimeout(() => state.recording && stopRec(), 5000);
   }
@@ -191,10 +276,22 @@
   function stopRec() {
     state.recording = false;
     cancelAnimationFrame(raf);
-    stream?.getTracks().forEach((t) => t.stop()); ctx?.close();
     try { recog?.stop(); } catch {}
+    recog = null;
     $("btn-rec").classList.remove("on"); $("btn-rec").textContent = "🎤";
-    setTimeout(score, SR ? 400 : 0); // 認識結果の到着を少し待つ
+    $("btn-zh-rec").classList.remove("on"); $("btn-zh-rec").textContent = "🎤";
+    setTimeout(state.mode === "zh" ? scoreZh : score, SR ? 400 : 0); // 認識結果の到着を少し待つ
+  }
+
+  // 普通話：音声認識の文字一致で採点
+  function scoreZh() {
+    const p = cur(); if (!p?.zh) return;
+    if (!SR) { showResult(0, "採点できません", "このブラウザは音声認識に非対応です", ""); return; }
+    const target = [...p.zh.split(/[／/]/)[0].replace(/[？?！!、。，,\s]/g, "")];
+    const heard = transcript.split("|").map((t) => target.filter((ch) => t.includes(ch)).length / (target.length || 1));
+    const s = Math.round(Math.max(0, ...heard) * 100);
+    showResult(s, s >= 80 ? "🎉 普通話もばっちり！" : s >= 50 ? "👍 もう少し！" : "💪 ▶ でお手本を聞いてみよう",
+      `認識: ${transcript.split("|")[0] || "（なし）"}`, "普通話モード（文字一致で採点）");
   }
 
   /* ---------- Scoring ---------- */
@@ -210,9 +307,17 @@
     const p = cur();
     const user = normalizeUser(state.pitch);
     if (user.length < 5) { showResult(0, "声が聞き取れませんでした", "もう少し大きな声でどうぞ", ""); return; }
-    const hasTone = tonesOf(p).length > 0;
-    const exp = hasTone ? expectedCurve(p) : [];
-    const toneScore = hasTone ? Math.round(Math.max(0, pearson(resample(user, exp.length), exp)) * 100) : null;
+    const ref = refCurve[p.id];
+    let toneScore = null;
+    if (ref) {
+      // 友達の声と比較：形の似方(相関) 70% + 高さのズレの小ささ 30%
+      const u = resample(user, ref.length);
+      const mad = u.reduce((s, v, i) => s + Math.abs(v - ref[i]), 0) / u.length;
+      toneScore = Math.round((0.7 * Math.max(0, pearson(u, ref)) + 0.3 * Math.max(0, 1 - mad / 2)) * 100);
+    } else if (tonesOf(p).length) {
+      const exp = expectedCurve(p);
+      toneScore = Math.round(Math.max(0, pearson(resample(user, exp.length), exp)) * 100);
+    }
 
     let textScore = null;
     if (SR) {
@@ -220,7 +325,7 @@
       const heard = transcript.split("|").map((t) => [...target].filter((ch) => t.includes(ch)).length / (target.length || 1));
       textScore = Math.round(Math.max(0, ...heard) * 100);
     }
-    if (textScore === null && toneScore === null) { showResult(0, "採点できません", "粤拼を登録すると声調で採点できます", ""); return; }
+    if (textScore === null && toneScore === null) { showResult(0, "採点できません", "お手本を録音すると、友達の声と比べて採点できます", ""); return; }
     const total = textScore === null ? toneScore : toneScore === null ? textScore : Math.round(textScore * 0.6 + toneScore * 0.4);
     const verdict = total >= 80 ? "🎉 ばっちり！ネイティブに通じる" : total >= 55 ? "👍 いい感じ！声調をもう一押し" : "💪 お手本をもう一度聞いてみよう";
     const advice = toneScore !== null && toneScore < 60 ? "声調カーブがズレています。高低差を大げさに。" : "";
@@ -255,7 +360,20 @@
   const step = (d) => { if (!list().length) return; state.idx = (state.idx + d + list().length) % list().length; render(); };
   $("btn-play").onclick = () => play(1);
   $("btn-slow").onclick = () => play(0.7);
-  $("btn-rec").onclick = () => (state.recording ? stopRec() : startRec());
+  $("btn-rec").onclick = () => (state.recording ? stopRec() : startRec("yue"));
+  $("btn-zh-play").onclick = playZh;
+  $("btn-zh-rec").onclick = () => (state.recording ? stopRec() : startRec("zh"));
+  const toggleTag = (t) => {
+    const p = cur(); if (!p) return;
+    const tg = tagsOf(p), next = tg.includes(t) ? tg.filter((x) => x !== t) : [...tg, t];
+    setTags(p.id, next);
+    if (p.cat === "mine") { p.tags = next; saveMine(mine); }
+    notice(`${TAGS[t].label} ${next.includes(t) ? "を付けました" : "を外しました"}`);
+    if (state.cat.startsWith("tag-")) { state.idx = Math.max(0, Math.min(state.idx, list().length - 1)); render(); }
+    else { $("tag-freq").classList.toggle("on", next.includes("freq")); $("tag-slang").classList.toggle("on", next.includes("slang")); }
+  };
+  $("tag-freq").onclick = () => toggleTag("freq");
+  $("tag-slang").onclick = () => toggleTag("slang");
   $("btn-prev").onclick = () => step(-1);
   $("btn-next").onclick = () => step(1);
   $("btn-tones").onclick = () => $("tone-dialog").showModal();
@@ -267,6 +385,9 @@
     editingId = p ? p.id : null; recAudio = p ? p.audio || null : null;
     $("f-hanzi").value = p?.hanzi || ""; $("f-jyut").value = p?.jyut || "";
     $("f-jp").value = p?.jp || ""; $("f-scene").value = p?.scene || ""; $("f-tip").value = p?.tip || "";
+    $("f-zh").value = p?.zh || ""; $("f-zhkana").value = p?.zhKana || "";
+    const tg = p ? tagsOf(p) : [];
+    $("f-tag-freq").checked = tg.includes("freq"); $("f-tag-slang").checked = tg.includes("slang");
     $("form-title").textContent = p ? "単語を編集" : "今日の単語を追加";
     updateRecUI(); $("add-dialog").showModal();
   }
@@ -310,11 +431,14 @@
     if (jyut && jyut.split(" ").some((s) => !/^[a-z]+[1-6]$/.test(s))) {
       return notice("粤拼は「nei5 hou2」のように、音節ごとに声調番号(1〜6)を付けてスペースで区切ってください");
     }
+    const tags = [$("f-tag-freq").checked && "freq", $("f-tag-slang").checked && "slang"].filter(Boolean);
     const item = { id: editingId || "mine-" + Date.now(), cat: "mine", hanzi, jyut,
-      jp: $("f-jp").value.trim(), scene: $("f-scene").value.trim(), tip: $("f-tip").value.trim(), audio: recAudio };
+      jp: $("f-jp").value.trim(), scene: $("f-scene").value.trim(), tip: $("f-tip").value.trim(), audio: recAudio,
+      zh: $("f-zh").value.trim(), zhKana: $("f-zhkana").value.trim(), tags };
     const next = editingId ? mine.map((m) => (m.id === editingId ? item : m)) : [item, ...mine];
     if (!saveMine(next)) return;
-    mine = next; delete audioUrl[item.id];
+    setTags(item.id, tags);
+    mine = next; delete audioUrl[item.id]; delete refCurve[item.id];
     $("add-dialog").close();
     state.cat = "mine"; state.idx = mine.findIndex((m) => m.id === item.id);
     renderTabs(); render(); notice(editingId ? "更新しました" : "追加しました！");

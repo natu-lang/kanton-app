@@ -9,6 +9,20 @@
     catch { notice("保存容量がいっぱいです。録音つきの単語をいくつか削除してください"); return false; }
   };
   let mine = loadMine();
+  // マイ単語に中国語・粤拼が無ければ、同じ単語のデフォルトカードから自動補完
+  (() => {
+    const alias = { "好啊": "hou2aa3", "俩": "b-loeng5", "两": "b-loeng5", "我想在香港俩星期": "b-hoeng1gong2" };
+    const byHanzi = Object.fromEntries(PHRASES.map((p) => [p.hanzi.replace(/[？?]/g, ""), p]));
+    let changed = false;
+    mine.forEach((m) => {
+      const key = (m.hanzi || "").replace(/[？?\s]/g, "");
+      const src = alias[key] ? PHRASES.find((p) => p.id === alias[key]) : byHanzi[key];
+      if (!src) return;
+      if (!m.zh && src.zh) { m.zh = src.zh; m.zhKana = src.zhKana; changed = true; }
+      if (!m.jyut && src.jyut && alias[key] !== "b-hoeng1gong2" && !["俩", "两"].includes(key)) { m.jyut = src.jyut; changed = true; }
+    });
+    if (changed) localStorage.setItem(MINE_KEY, JSON.stringify(mine));
+  })();
   state.cat = mine.length ? "mine" : "greet";
   // タグ（デフォルト単語にも付けられるよう端末内に上書き保存）
   const TAG_KEY = "kg-tags";
